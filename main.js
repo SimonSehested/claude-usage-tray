@@ -69,34 +69,15 @@ function usageColor(v) {
   return '#FF3B30';
 }
 
-function svgArc(cx, cy, r, util) {
-  if (!util || util <= 0.002) return '';
-  const u  = Math.min(util, 0.9999);
-  const sx = cx + r * Math.cos(-Math.PI / 2);
-  const sy = cy + r * Math.sin(-Math.PI / 2);
-  const ex = cx + r * Math.cos(-Math.PI / 2 + u * 2 * Math.PI);
-  const ey = cy + r * Math.sin(-Math.PI / 2 + u * 2 * Math.PI);
-  return `M${sx.toFixed(3)},${sy.toFixed(3)} A${r},${r} 0 ${u > 0.5 ? 1 : 0},1 ${ex.toFixed(3)},${ey.toFixed(3)}`;
-}
 
 function makeTrayIcon(sd, fh) {
-  // Track color adapts to system theme — no background box
-  const track = nativeTheme.shouldUseDarkColors
-    ? 'rgba(255,255,255,0.25)'
-    : 'rgba(0,0,0,0.22)';
-
-  const cx = 16, cy = 16;
-  const r1 = 11, r2 = 6.5;
-  const w1 = 3,  w2 = 2.5;
-
-  const sdArc = svgArc(cx, cy, r1, sd);
-  const fhArc = svgArc(cx, cy, r2, fh);
+  // Two colored circles, no background — readable on any taskbar color
+  const sdColor = usageColor(sd);
+  const fhColor = usageColor(fh);
 
   const svg = `<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="${cx}" cy="${cy}" r="${r1}" fill="none" stroke="${track}" stroke-width="${w1}"/>
-    ${sdArc ? `<path d="${sdArc}" fill="none" stroke="${usageColor(sd)}" stroke-width="${w1}" stroke-linecap="round"/>` : ''}
-    <circle cx="${cx}" cy="${cy}" r="${r2}" fill="none" stroke="${track}" stroke-width="${w2}"/>
-    ${fhArc ? `<path d="${fhArc}" fill="none" stroke="${usageColor(fh)}" stroke-width="${w2}" stroke-linecap="round"/>` : ''}
+    <circle cx="16" cy="16" r="12" fill="none" stroke="${sdColor}" stroke-width="4"/>
+    <circle cx="16" cy="16" r="5"  fill="${fhColor}"/>
   </svg>`;
 
   return nativeImage.createFromDataURL(
@@ -156,8 +137,7 @@ function createWindow() {
     minWidth:        360,
     minHeight:       200,
     frame:           false,
-    transparent:     true,
-    backgroundColor: '#00000000',
+    backgroundColor: '#F2F2F7',
     alwaysOnTop:     true,
     skipTaskbar:     true,
     resizable:       false,
