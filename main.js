@@ -178,6 +178,10 @@ ipcMain.handle('get-usage', async () => {
 
 ipcMain.on('close-window', () => win?.hide());
 
+ipcMain.on('update-tray-icon', (_, dataUrl) => {
+  try { tray?.setImage(nativeImage.createFromDataURL(dataUrl)); } catch {}
+});
+
 ipcMain.on('set-window-height', (_, h) => {
   const clamped = Math.max(200, Math.min(Math.round(h), 680));
   win.setSize(360, clamped, false);

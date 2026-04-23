@@ -80,6 +80,30 @@ function drawRings(canvas, sdUtil, fhUtil) {
 }
 
 
+// ── Tray icon — canvas PNG sent to main process ───────────────────────────────
+
+function renderTrayIcon(sdUtil, fhUtil) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const cx = 32, cy = 32;
+
+  // Outer ring = 7-day color
+  ctx.beginPath();
+  ctx.arc(cx, cy, 26, 0, Math.PI * 2);
+  ctx.strokeStyle = usageColor(sdUtil || 0);
+  ctx.lineWidth = 10;
+  ctx.stroke();
+
+  // Inner filled dot = 5-hour color
+  ctx.beginPath();
+  ctx.arc(cx, cy, 11, 0, Math.PI * 2);
+  ctx.fillStyle = usageColor(fhUtil || 0);
+  ctx.fill();
+
+  window.electronAPI.updateTrayIcon(canvas.toDataURL('image/png'));
+}
+
 // ── Main render function ──────────────────────────────────────────────────────
 
 function render(data) {
@@ -176,6 +200,7 @@ function render(data) {
     document.getElementById('footer').textContent = `Updated ${hh}:${mm}`;
   }
 
+  renderTrayIcon(sdUtil, fhUtil);
   adjustHeight();
 }
 
