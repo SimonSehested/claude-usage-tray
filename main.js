@@ -125,11 +125,6 @@ function createWindow() {
     },
   });
 
-  // Windows 11 native acrylic material (graceful fallback on older OS)
-  if (process.platform === 'win32') {
-    try { win.setBackgroundMaterial('acrylic'); } catch {}
-  }
-
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   win.webContents.once('did-finish-load', () => { windowReady = true; });
