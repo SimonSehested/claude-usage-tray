@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, nativeImage, ipcMain, Menu, screen } = require('electron');
+const { app, BrowserWindow, Tray, nativeImage, ipcMain, Menu, screen, nativeTheme } = require('electron');
 const path  = require('path');
 const fs    = require('fs');
 const https = require('https');
@@ -42,9 +42,9 @@ function fetchUsage() {
       path:     '/api/oauth/usage',
       method:   'GET',
       headers: {
-        'Authorization':    `Bearer ${token}`,
-        'Content-Type':     'application/json',
-        'anthropic-beta':   'oauth-2025-04-20',
+        'Authorization':  `Bearer ${token}`,
+        'Content-Type':   'application/json',
+        'anthropic-beta': 'oauth-2025-04-20',
       },
     }, (res) => {
       let raw = '';
@@ -61,18 +61,50 @@ function fetchUsage() {
   });
 }
 
-// ── Tray icon (SVG, updated with PNG from renderer once loaded) ───────────────
+// ── Tray icon — SVG, no background, theme-adaptive track ─────────────────────
 
-function makePlaceholderIcon() {
+function usageColor(v) {
+  if (!v || v < 0.60) return '#34C759';
+  if (v < 0.85) return '#FF9F0A';
+  return '#FF3B30';
+}
+
+function svgArc(cx, cy, r, util) {
+  if (!util || util <= 0.002) return '';
+  const u  = Math.min(util, 0.9999);
+  const sx = cx + r * Math.cos(-Math.PI / 2);
+  const sy = cy + r * Math.sin(-Math.PI / 2);
+  const ex = cx + r * Math.cos(-Math.PI / 2 + u * 2 * Math.PI);
+  const ey = cy + r * Math.sin(-Math.PI / 2 + u * 2 * Math.PI);
+  return `M${sx.toFixed(3)},${sy.toFixed(3)} A${r},${r} 0 ${u > 0.5 ? 1 : 0},1 ${ex.toFixed(3)},${ey.toFixed(3)}`;
+}
+
+function makeTrayIcon(sd, fh) {
+  // Track color adapts to system theme — no background box
+  const track = nativeTheme.shouldUseDarkColors
+    ? 'rgba(255,255,255,0.25)'
+    : 'rgba(0,0,0,0.22)';
+
+  const cx = 16, cy = 16;
+  const r1 = 11, r2 = 6.5;
+  const w1 = 3,  w2 = 2.5;
+
+  const sdArc = svgArc(cx, cy, r1, sd);
+  const fhArc = svgArc(cx, cy, r2, fh);
+
   const svg = `<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-    <rect width="32" height="32" rx="7" fill="#1C1C2E"/>
-    <circle cx="16" cy="16" r="10" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="3"/>
-    <circle cx="16" cy="16" r="5.5" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="2.5"/>
+    <circle cx="${cx}" cy="${cy}" r="${r1}" fill="none" stroke="${track}" stroke-width="${w1}"/>
+    ${sdArc ? `<path d="${sdArc}" fill="none" stroke="${usageColor(sd)}" stroke-width="${w1}" stroke-linecap="round"/>` : ''}
+    <circle cx="${cx}" cy="${cy}" r="${r2}" fill="none" stroke="${track}" stroke-width="${w2}"/>
+    ${fhArc ? `<path d="${fhArc}" fill="none" stroke="${usageColor(fh)}" stroke-width="${w2}" stroke-linecap="round"/>` : ''}
   </svg>`;
+
   return nativeImage.createFromDataURL(
     'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64')
   );
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function normalise(v) { v = parseFloat(v); return v > 1 ? v / 100 : v; }
 
@@ -86,6 +118,18 @@ function buildTooltip() {
   return parts.length ? 'Claude Usage — ' + parts.join(' | ') : 'Claude Usage';
 }
 
+function updateTray() {
+  if (!tray) return;
+  let sd = null, fh = null;
+  if (usageData) {
+    const sdv = usageData.seven_day, fhv = usageData.five_hour;
+    if (sdv?.utilization != null) sd = normalise(sdv.utilization);
+    if (fhv?.utilization != null) fh = normalise(fhv.utilization);
+  }
+  tray.setImage(makeTrayIcon(sd, fh));
+  tray.setToolTip(buildTooltip());
+}
+
 // ── Refresh ───────────────────────────────────────────────────────────────────
 
 async function refresh() {
@@ -95,9 +139,9 @@ async function refresh() {
     lastUpdated = new Date();
   } catch (e) {
     if (!e.isRateLimit) lastError = e.message;
-    // On 429: keep existing usageData and lastUpdated, show nothing new
+    // On 429: keep existing usageData and lastUpdated silently
   }
-  tray?.setToolTip(buildTooltip());
+  updateTray();
   if (windowReady && win?.isVisible()) {
     win.webContents.send('usage-data', { usageData, lastError, lastUpdated });
   }
@@ -126,9 +170,7 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-
   win.webContents.once('did-finish-load', () => { windowReady = true; });
-
   win.on('blur', () => {
     if (!win.webContents.isDevToolsFocused()) win.hide();
   });
@@ -156,12 +198,6 @@ ipcMain.handle('get-usage', async () => {
 
 ipcMain.on('close-window', () => win?.hide());
 
-ipcMain.on('update-tray-icon', (_, dataUrl) => {
-  try {
-    tray?.setImage(nativeImage.createFromDataURL(dataUrl));
-  } catch {}
-});
-
 ipcMain.on('set-window-height', (_, h) => {
   const clamped = Math.max(200, Math.min(Math.round(h), 680));
   win.setSize(360, clamped, false);
@@ -173,11 +209,14 @@ ipcMain.on('set-window-height', (_, h) => {
 app.whenReady().then(() => {
   app.setAppUserModelId('com.simonse.claudeusage');
 
-  tray = new Tray(makePlaceholderIcon());
+  tray = new Tray(makeTrayIcon(null, null));
   tray.setToolTip('Claude Usage — Loading…');
 
+  // Re-render icon whenever the user switches light/dark mode
+  nativeTheme.on('updated', updateTray);
+
   const ctxMenu = Menu.buildFromTemplate([
-    { label: 'View Usage',  click: async () => {
+    { label: 'View Usage', click: async () => {
         if (!win.isVisible()) {
           await refresh();
           showWindow();
@@ -202,7 +241,6 @@ app.whenReady().then(() => {
   });
 
   createWindow();
-
   refresh();
   setInterval(refresh, REFRESH_MS);
 });

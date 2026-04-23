@@ -30,17 +30,6 @@ html, body {
   margin-bottom: 12px;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.claude-icon {
-  color: #636366;
-  flex-shrink: 0;
-}
-
 .title {
   font-size: 14px;
   font-weight: 600;

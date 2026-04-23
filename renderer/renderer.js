@@ -79,44 +79,6 @@ function drawRings(canvas, sdUtil, fhUtil) {
   ctx.fillText('7-Day', cx, cy + 14);
 }
 
-// ── Tray icon (rendered in renderer, sent to main as PNG) ─────────────────────
-
-function renderTrayIcon(sdUtil, fhUtil) {
-  const canvas = document.createElement('canvas');
-  canvas.width  = 64;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  const cx = 32, cy = 32;
-
-  // Dark rounded background
-  ctx.beginPath();
-  ctx.roundRect(0, 0, 64, 64, 11);
-  ctx.fillStyle = '#1C1C2E';
-  ctx.fill();
-
-  function trayRing(r, w, util) {
-    ctx.lineWidth = w;
-    ctx.lineCap   = 'butt';
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-    ctx.stroke();
-
-    if (util > 0.002) {
-      const end = Math.min(util, 0.9999) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + end);
-      ctx.strokeStyle = usageColor(util);
-      ctx.lineCap     = 'round';
-      ctx.stroke();
-    }
-  }
-
-  trayRing(22, 5.5, sdUtil || 0);
-  trayRing(12, 4,   fhUtil || 0);
-
-  return canvas.toDataURL('image/png');
-}
 
 // ── Main render function ──────────────────────────────────────────────────────
 
@@ -213,11 +175,6 @@ function render(data) {
     const mm = String(t.getMinutes()).padStart(2, '0');
     document.getElementById('footer').textContent = `Updated ${hh}:${mm}`;
   }
-
-  // Send updated tray icon to main process
-  try {
-    window.electronAPI.updateTrayIcon(renderTrayIcon(sdUtil, fhUtil));
-  } catch {}
 
   adjustHeight();
 }
