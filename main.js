@@ -51,6 +51,7 @@ function fetchUsage() {
       res.on('data', c => raw += c);
       res.on('end', () => {
         if (res.statusCode === 401) return reject(new Error('Token expired — run "claude" in a terminal.'));
+        if (res.statusCode === 429) { const e = new Error('Rate limited'); e.isRateLimit = true; return reject(e); }
         if (res.statusCode !== 200) return reject(new Error(`API error ${res.statusCode}`));
         try { resolve(JSON.parse(raw)); } catch { reject(new Error('Invalid API response')); }
       });
@@ -93,7 +94,8 @@ async function refresh() {
     lastError   = null;
     lastUpdated = new Date();
   } catch (e) {
-    lastError = e.message;
+    if (!e.isRateLimit) lastError = e.message;
+    // On 429: keep existing usageData and lastUpdated, show nothing new
   }
   tray?.setToolTip(buildTooltip());
   if (windowReady && win?.isVisible()) {
