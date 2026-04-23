@@ -19,21 +19,7 @@ html, body {
   -webkit-backdrop-filter: blur(48px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 18px;
-  box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.18),
-    0 2px 8px  rgba(0, 0, 0, 0.10),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-
-  /* Fade + lift animation — starts invisible/small */
-  opacity: 0;
-  transform: scale(0.95) translateY(6px);
-  transition: opacity 180ms cubic-bezier(0.4, 0, 0.2, 1),
-              transform 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.glass-panel.visible {
-  opacity: 1;
-  transform: scale(1) translateY(0);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */

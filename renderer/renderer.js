@@ -244,14 +244,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.electronAPI.closeWindow();
   });
 
-  // Animate in on every show event
-  window.electronAPI.onShowAnimate(() => {
-    const panel = document.getElementById('panel');
-    panel.classList.remove('visible');
-    // Double rAF ensures class removal is painted before re-adding
-    requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('visible')));
-  });
-
   // Push updates from background refresh
   window.electronAPI.onUsageData(render);
 
@@ -259,6 +251,4 @@ window.addEventListener('DOMContentLoaded', async () => {
   const data = await window.electronAPI.getUsage();
   render(data);
 
-  // Trigger first animation after a short delay
-  setTimeout(() => document.getElementById('panel').classList.add('visible'), 40);
 });

@@ -148,7 +148,6 @@ function showWindow() {
   positionWindow();
   win.show();
   win.focus();
-  win.webContents.send('show-animate');
 }
 
 // ── IPC ───────────────────────────────────────────────────────────────────────
