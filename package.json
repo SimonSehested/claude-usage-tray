@@ -1,0 +1,30 @@
+{
+  "name": "claude-usage-tray",
+  "version": "1.0.0",
+  "description": "Claude AI usage monitor — system tray app with Liquid Glass design",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.simonse.claudeusage",
+    "productName": "Claude Usage",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "renderer/**/*"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": false,
+      "runAfterFinish": true
+    }
+  }
+}
