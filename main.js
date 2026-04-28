@@ -305,8 +305,12 @@ app.whenReady().then(() => {
       win.hide();
     } else {
       await refresh();
+      console.log('showing window now');
       win.show();
       win.focus();
+      if (windowReady) {
+        win.webContents.send('usage-data', { usageData, lastError, lastUpdated });
+      }
     }
   });
 
