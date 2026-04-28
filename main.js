@@ -1,14 +1,12 @@
 const { app, BrowserWindow, Tray, nativeImage, ipcMain, Menu, screen, nativeTheme } = require('electron');
-const path  = require('path');
-const https = require('https');
+const path      = require('path');
+const { exec }  = require('child_process');
+const os        = require('os');
 
 if (!app.requestSingleInstanceLock()) { app.quit(); }
 
 // ── Paths & constants ─────────────────────────────────────────────────────────
 
-const API_KEY    = process.env.MINIMAX_API_KEY;
-const API_HOST   = process.env.MINIMAX_API_HOST || 'api.minimax.chat';
-const API_PATH   = process.env.MINIMAX_API_USAGE_PATH || '/v1/usage';
 const REFRESH_MS = 5 * 60 * 1000;
 
 let tray        = null;
@@ -20,33 +18,65 @@ let lastError   = null;
 let lastUpdated = null;
 let lastValidIcon = null;
 
-// ── Token / API ───────────────────────────────────────────────────────────────
+// ── Token / mmx CLI quota ──────────────────────────────────────────────────────
 
 function fetchUsage() {
   return new Promise((resolve, reject) => {
-    if (!API_KEY) {
-      return reject(new Error('MINIMAX_API_KEY not set in environment.'));
-    }
-    const req = https.request({
-      hostname: API_HOST,
-      path:     API_PATH,
-      method:   'GET',
-      headers: {
-        'Authorization': `Bearer ${API_KEY}`,
-        'Content-Type':  'application/json',
-      },
-    }, (res) => {
-      let raw = '';
-      res.on('data', c => raw += c);
-      res.on('end', () => {
-        if (res.statusCode === 401) return reject(new Error('Invalid or expired API key.'));
-        if (res.statusCode === 429) { const e = new Error('Rate limited'); e.isRateLimit = true; return reject(e); }
-        if (res.statusCode !== 200) return reject(new Error(`API error ${res.statusCode}`));
-        try { resolve(JSON.parse(raw)); } catch { reject(new Error('Invalid API response')); }
-      });
+    exec('mmx quota show --output json --no-color', { timeout: 10000 }, (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error('Failed to run mmx CLI. Is it installed?'));
+      }
+      try {
+        const data = JSON.parse(stdout);
+        if (data.base_resp?.status_msg !== 'success') {
+          return reject(new Error(data.base_resp?.status_msg || 'mmx quota failed'));
+        }
+
+        const models = data.model_remains || [];
+
+        const findModel = (name) => models.find(m => m.model_name === name);
+
+        const mmx = findModel('MiniMax-M*');
+        const codingVlm = findModel('coding-plan-vlm');
+        const codingSearch = findModel('coding-plan-search');
+
+        const weekModel = mmx || codingVlm || codingSearch;
+
+        if (!weekModel) {
+          return reject(new Error('No usage data found'));
+        }
+
+        const fiveHourModel = models.find(m =>
+          m.model_name !== 'MiniMax-M*' &&
+          m.model_name !== 'coding-plan-vlm' &&
+          m.model_name !== 'coding-plan-search' &&
+          m.current_interval_total_count > 0
+        );
+
+        const parseUtilization = (model) => {
+          if (!model || model.current_interval_total_count === 0) return null;
+          return model.current_interval_usage_count / model.current_interval_total_count;
+        };
+
+        const parseWeeklyUtilization = (model) => {
+          if (!model || model.current_weekly_total_count === 0) return null;
+          return model.current_weekly_usage_count / model.current_weekly_total_count;
+        };
+
+        resolve({
+          five_hour: {
+            utilization: parseUtilization(fiveHourModel || weekModel),
+            resets_at: fiveHourModel?.end_time ? new Date(fiveHourModel.end_time).toISOString() : null,
+          },
+          seven_day: {
+            utilization: parseWeeklyUtilization(weekModel),
+            resets_at: weekModel?.weekly_end_time ? new Date(weekModel.weekly_end_time).toISOString() : null,
+          },
+        });
+      } catch (e) {
+        reject(new Error('Invalid mmx output: ' + e.message));
+      }
     });
-    req.on('error', reject);
-    req.end();
   });
 }
 
