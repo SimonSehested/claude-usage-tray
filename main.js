@@ -198,14 +198,23 @@ function updateTray() {
 // ── Refresh ───────────────────────────────────────────────────────────────────
 
 async function refresh() {
+  console.log('refresh called');
   try {
+    console.log('calling fetchUsage...');
     usageData   = await fetchUsage();
+    console.log('fetchUsage done:', usageData);
     lastError   = null;
     lastUpdated = new Date();
   } catch (e) {
+    console.log('fetchUsage error:', e.message);
     if (!e.isRateLimit) lastError = e.message;
-    // On 429: keep existing usageData and lastUpdated silently
   }
+  updateTray();
+  console.log('updateTray done, sending to window');
+  if (win && win.isVisible()) {
+    win.webContents.send('usage-data', { usageData, lastError, lastUpdated });
+  }
+}
   updateTray();
   if (windowReady && win?.isVisible()) {
     win.webContents.send('usage-data', { usageData, lastError, lastUpdated });
