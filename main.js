@@ -215,17 +215,6 @@ async function refresh() {
     win.webContents.send('usage-data', { usageData, lastError, lastUpdated });
   }
 }
-  updateTray();
-  console.log('updateTray done, sending to window');
-  if (win && win.isVisible()) {
-    win.webContents.send('usage-data', { usageData, lastError, lastUpdated });
-  }
-}
-  updateTray();
-  if (windowReady && win?.isVisible()) {
-    win.webContents.send('usage-data', { usageData, lastError, lastUpdated });
-  }
-}
 
 // ── Window ────────────────────────────────────────────────────────────────────
 
