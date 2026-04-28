@@ -53,26 +53,83 @@ function fetchUsage() {
           m.current_interval_total_count > 0
         );
 
-        const parseUtilization = (model) => {
-          if (!model || model.current_interval_total_count === 0) return null;
-          return model.current_interval_usage_count / model.current_interval_total_count;
-        };
+        function parseUtilization(model) {
+  if (!model || model.current_interval_total_count === 0) return null;
+  return model.current_interval_usage_count / model.current_interval_total_count;
+}
 
-        const parseWeeklyUtilization = (model) => {
-          if (!model || model.current_weekly_total_count === 0) return null;
-          return model.current_weekly_usage_count / model.current_weekly_total_count;
-        };
+function parseWeeklyUtilization(model) {
+  if (!model || model.current_weekly_total_count === 0) return null;
+  return model.current_weekly_usage_count / model.current_weekly_total_count;
+}
 
-        resolve({
-          five_hour: {
-            utilization: parseUtilization(fiveHourModel || weekModel),
-            resets_at: fiveHourModel?.end_time ? new Date(fiveHourModel.end_time).toISOString() : null,
-          },
-          seven_day: {
-            utilization: parseWeeklyUtilization(weekModel),
-            resets_at: weekModel?.weekly_end_time ? new Date(weekModel.weekly_end_time).toISOString() : null,
-          },
-        });
+function resolveUsageModels(models) {
+  const findModel = (name) => models.find(m => m.model_name === name);
+
+  const mmx = findModel('MiniMax-M*');
+  const codingVlm = findModel('coding-plan-vlm');
+  const codingSearch = findModel('coding-plan-search');
+
+  const weekModel = mmx || codingVlm || codingSearch;
+
+  const fiveHourCandidate = models.find(m =>
+    m.model_name !== 'MiniMax-M*' &&
+    m.model_name !== 'coding-plan-vlm' &&
+    m.model_name !== 'coding-plan-search' &&
+    m.current_interval_total_count > 0
+  );
+
+  const isFiveHourValid = fiveHourCandidate &&
+    fiveHourCandidate.end_time > Date.now();
+
+  if (isFiveHourValid) {
+    return {
+      five_hour: {
+        utilization: parseUtilization(fiveHourCandidate),
+        resets_at: new Date(fiveHourCandidate.end_time).toISOString(),
+      },
+      seven_day: {
+        utilization: parseWeeklyUtilization(weekModel),
+        resets_at: weekModel?.weekly_end_time ? new Date(weekModel.weekly_end_time).toISOString() : null,
+      },
+    };
+  }
+
+  return {
+    five_hour: null,
+    seven_day: {
+      utilization: parseWeeklyUtilization(weekModel),
+      resets_at: weekModel?.weekly_end_time ? new Date(weekModel.weekly_end_time).toISOString() : null,
+    },
+  };
+}
+
+function fetchUsage() {
+  return new Promise((resolve, reject) => {
+    exec('mmx quota show --output json --no-color', { timeout: 10000 }, (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error('Failed to run mmx CLI. Is it installed?'));
+      }
+      try {
+        const data = JSON.parse(stdout);
+        if (data.base_resp?.status_msg !== 'success') {
+          return reject(new Error(data.base_resp?.status_msg || 'mmx quota failed'));
+        }
+
+        const models = data.model_remains || [];
+        const result = resolveUsageModels(models);
+
+        if (!result.seven_day.utilization && !result.five_hour) {
+          return reject(new Error('No usage data found'));
+        }
+
+        resolve(result);
+      } catch (e) {
+        reject(new Error('Invalid mmx output: ' + e.message));
+      }
+    });
+  });
+}
       } catch (e) {
         reject(new Error('Invalid mmx output: ' + e.message));
       }

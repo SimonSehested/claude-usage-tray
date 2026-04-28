@@ -130,36 +130,9 @@ function render(data) {
   const fhv    = usageData.five_hour;
   const sdUtil = sdv?.utilization != null ? normalise(sdv.utilization) : 0;
   const fhUtil = fhv?.utilization != null ? normalise(fhv.utilization) : 0;
+  const hasFiveHour = fhUtil > 0;
 
   const resets = [fmtReset(sdv?.resets_at), fmtReset(fhv?.resets_at)].filter(Boolean);
-
-  // Extra model bars
-  const EXTRA = [['seven_day_sonnet','7-Day Sonnet'],['seven_day_opus','7-Day Opus']];
-  const bars = EXTRA
-    .map(([k, label]) => {
-      const v = usageData[k];
-      return v?.utilization != null
-        ? { label, util: normalise(v.utilization), resets: v.resets_at }
-        : null;
-    })
-    .filter(Boolean);
-
-  const barsHtml = bars.map(b => {
-    const pct   = Math.round(b.util * 100);
-    const color = usageColor(b.util);
-    const reset = fmtReset(b.resets);
-    return `
-      <div class="bar-card">
-        <div class="bar-header">
-          <span class="bar-label">${escHtml(b.label)}</span>
-          <span class="bar-pct" style="color:${color}">${pct}%</span>
-        </div>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:0%;background:${color}" data-target="${pct}"></div>
-        </div>
-        ${reset ? `<div class="bar-reset">${reset}</div>` : ''}
-      </div>`;
-  }).join('');
 
   const resetRowHtml = resets.map(t =>
     `<div class="reset-row">${t}</div>`
@@ -173,14 +146,14 @@ function render(data) {
           <div class="legend-dot" style="background:${usageColor(sdUtil)}"></div>
           <span>7d&ensp;${Math.round(sdUtil * 100)}%</span>
         </div>
+        ${hasFiveHour ? `
         <div class="legend-item">
           <div class="legend-dot" style="background:${usageColor(fhUtil)}"></div>
           <span>5h&ensp;${Math.round(fhUtil * 100)}%</span>
-        </div>
+        </div>` : ''}
       </div>
       ${resetRowHtml}
     </div>
-    ${bars.length ? `<div class="separator"></div>${barsHtml}` : ''}
   `;
 
   drawRings(document.getElementById('ringCanvas'), sdUtil, fhUtil);
