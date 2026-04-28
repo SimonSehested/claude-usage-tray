@@ -299,12 +299,14 @@ app.whenReady().then(() => {
   tray.setContextMenu(ctxMenu);
 
   tray.on('click', async () => {
+    if (!win) { console.log('win is null'); return; }
+    console.log('click handler called, visible:', win.isVisible());
     if (win.isVisible()) {
       win.hide();
     } else {
       await refresh();
-      showWindow();
-      if (windowReady) win.webContents.send('usage-data', { usageData, lastError, lastUpdated });
+      win.show();
+      win.focus();
     }
   });
 
