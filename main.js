@@ -20,40 +20,7 @@ let lastValidIcon = null;
 
 // ── Token / mmx CLI quota ──────────────────────────────────────────────────────
 
-function fetchUsage() {
-  return new Promise((resolve, reject) => {
-    exec('mmx quota show --output json --no-color', { timeout: 10000 }, (err, stdout, stderr) => {
-      if (err) {
-        return reject(new Error('Failed to run mmx CLI. Is it installed?'));
-      }
-      try {
-        const data = JSON.parse(stdout);
-        if (data.base_resp?.status_msg !== 'success') {
-          return reject(new Error(data.base_resp?.status_msg || 'mmx quota failed'));
-        }
-
-        const models = data.model_remains || [];
-
-        const findModel = (name) => models.find(m => m.model_name === name);
-
-        const mmx = findModel('MiniMax-M*');
-        const codingVlm = findModel('coding-plan-vlm');
-        const codingSearch = findModel('coding-plan-search');
-
-        const weekModel = mmx || codingVlm || codingSearch;
-
-        if (!weekModel) {
-          return reject(new Error('No usage data found'));
-        }
-
-        const fiveHourModel = models.find(m =>
-          m.model_name !== 'MiniMax-M*' &&
-          m.model_name !== 'coding-plan-vlm' &&
-          m.model_name !== 'coding-plan-search' &&
-          m.current_interval_total_count > 0
-        );
-
-        function parseUtilization(model) {
+function parseUtilization(model) {
   if (!model || model.current_interval_total_count === 0) return null;
   return model.current_interval_usage_count / model.current_interval_total_count;
 }
@@ -124,12 +91,6 @@ function fetchUsage() {
         }
 
         resolve(result);
-      } catch (e) {
-        reject(new Error('Invalid mmx output: ' + e.message));
-      }
-    });
-  });
-}
       } catch (e) {
         reject(new Error('Invalid mmx output: ' + e.message));
       }
