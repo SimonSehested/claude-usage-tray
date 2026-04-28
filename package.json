@@ -1,7 +1,7 @@
 {
-  "name": "claude-usage-tray",
+  "name": "minimax-usage-tray",
   "version": "1.0.0",
-  "description": "Claude AI usage monitor — system tray app with Liquid Glass design",
+  "description": "MiniMax AI usage monitor — system tray app",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -12,8 +12,8 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.simonse.claudeusage",
-    "productName": "Claude Usage",
+    "appId": "com.simonse.minimaxusage",
+    "productName": "MiniMax Usage",
     "directories": { "output": "dist" },
     "files": ["main.js", "preload.js", "renderer/**/*"],
     "win": {

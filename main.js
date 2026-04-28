@@ -1,17 +1,14 @@
 const { app, BrowserWindow, Tray, nativeImage, ipcMain, Menu, screen, nativeTheme } = require('electron');
 const path  = require('path');
-const fs    = require('fs');
 const https = require('https');
-const os    = require('os');
 
 if (!app.requestSingleInstanceLock()) { app.quit(); }
 
 // ── Paths & constants ─────────────────────────────────────────────────────────
 
-const CREDENTIALS_PATH = path.join(
-  process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'),
-  '.credentials.json'
-);
+const API_KEY    = process.env.MINIMAX_API_KEY;
+const API_HOST   = process.env.MINIMAX_API_HOST || 'api.minimax.chat';
+const API_PATH   = process.env.MINIMAX_API_USAGE_PATH || '/v1/usage';
 const REFRESH_MS = 5 * 60 * 1000;
 
 let tray        = null;
@@ -21,36 +18,28 @@ let isQuitting  = false;
 let usageData   = null;
 let lastError   = null;
 let lastUpdated = null;
+let lastValidIcon = null;
 
 // ── Token / API ───────────────────────────────────────────────────────────────
 
-function loadToken() {
-  try {
-    return JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'))
-      .claudeAiOauth.accessToken;
-  } catch { return null; }
-}
-
 function fetchUsage() {
   return new Promise((resolve, reject) => {
-    const token = loadToken();
-    if (!token) {
-      return reject(new Error('Claude Code credentials not found. Run "claude" in a terminal first.'));
+    if (!API_KEY) {
+      return reject(new Error('MINIMAX_API_KEY not set in environment.'));
     }
     const req = https.request({
-      hostname: 'api.anthropic.com',
-      path:     '/api/oauth/usage',
+      hostname: API_HOST,
+      path:     API_PATH,
       method:   'GET',
       headers: {
-        'Authorization':  `Bearer ${token}`,
-        'Content-Type':   'application/json',
-        'anthropic-beta': 'oauth-2025-04-20',
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type':  'application/json',
       },
     }, (res) => {
       let raw = '';
       res.on('data', c => raw += c);
       res.on('end', () => {
-        if (res.statusCode === 401) return reject(new Error('Token expired — run "claude" in a terminal.'));
+        if (res.statusCode === 401) return reject(new Error('Invalid or expired API key.'));
         if (res.statusCode === 429) { const e = new Error('Rate limited'); e.isRateLimit = true; return reject(e); }
         if (res.statusCode !== 200) return reject(new Error(`API error ${res.statusCode}`));
         try { resolve(JSON.parse(raw)); } catch { reject(new Error('Invalid API response')); }
@@ -71,7 +60,6 @@ function usageColor(v) {
 
 
 function makeTrayIcon(sd, fh) {
-  // Two colored circles, no background — readable on any taskbar color
   const sdColor = usageColor(sd);
   const fhColor = usageColor(fh);
 
@@ -80,9 +68,18 @@ function makeTrayIcon(sd, fh) {
     <circle cx="16" cy="16" r="5"  fill="${fhColor}"/>
   </svg>`;
 
-  return nativeImage.createFromDataURL(
-    'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64')
-  );
+  try {
+    const icon = nativeImage.createFromDataURL(
+      'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64')
+    );
+    if (icon.isEmpty()) {
+      return lastValidIcon || icon;
+    }
+    lastValidIcon = icon;
+    return icon;
+  } catch {
+    return lastValidIcon || nativeImage.createEmpty();
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,13 +87,13 @@ function makeTrayIcon(sd, fh) {
 function normalise(v) { v = parseFloat(v); return v > 1 ? v / 100 : v; }
 
 function buildTooltip() {
-  if (lastError) return 'Claude Usage — Error';
-  if (!usageData) return 'Claude Usage — Loading…';
+  if (lastError) return 'MiniMax Usage — Error';
+  if (!usageData) return 'MiniMax Usage — Loading…';
   const parts = [];
   const sd = usageData.seven_day, fh = usageData.five_hour;
   if (sd?.utilization != null) parts.push(`7d: ${Math.round(normalise(sd.utilization) * 100)}%`);
   if (fh?.utilization != null) parts.push(`5h: ${Math.round(normalise(fh.utilization) * 100)}%`);
-  return parts.length ? 'Claude Usage — ' + parts.join(' | ') : 'Claude Usage';
+  return parts.length ? 'MiniMax Usage — ' + parts.join(' | ') : 'MiniMax Usage';
 }
 
 function updateTray() {
@@ -191,10 +188,10 @@ ipcMain.on('set-window-height', (_, h) => {
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
-  app.setAppUserModelId('com.simonse.claudeusage');
+  app.setAppUserModelId('com.simonse.minimaxusage');
 
   tray = new Tray(makeTrayIcon(null, null));
-  tray.setToolTip('Claude Usage — Loading…');
+  tray.setToolTip('MiniMax Usage — Loading…');
 
   // Re-render icon whenever the user switches light/dark mode
   nativeTheme.on('updated', updateTray);
@@ -210,7 +207,7 @@ app.whenReady().then(() => {
     },
     { label: 'Refresh Now', click: () => refresh() },
     { type: 'separator' },
-    { label: 'Quit Claude Usage', click: () => { isQuitting = true; app.quit(); } },
+    { label: 'Quit MiniMax Usage', click: () => { isQuitting = true; app.quit(); } },
   ]);
   tray.setContextMenu(ctxMenu);
 
