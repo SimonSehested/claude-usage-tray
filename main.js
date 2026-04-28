@@ -17,6 +17,7 @@ let usageData   = null;
 let lastError   = null;
 let lastUpdated = null;
 let lastValidIcon = null;
+let lastValidIconType = null;
 
 // ── Token / mmx CLI quota ──────────────────────────────────────────────────────
 
@@ -152,8 +153,11 @@ function updateTray() {
     if (sdv?.utilization != null) sd = normalise(sdv.utilization);
     if (fhv?.utilization != null) fh = normalise(fhv.utilization);
   }
-  tray.setImage(makeTrayIcon(sd, fh));
+  const icon = makeTrayIcon(sd, fh);
+  tray.setImage(icon);
   tray.setToolTip(buildTooltip());
+  lastValidIcon = icon;
+  lastValidIconType = 'svg';
 }
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
@@ -228,7 +232,16 @@ ipcMain.handle('get-usage', async () => {
 ipcMain.on('close-window', () => win?.hide());
 
 ipcMain.on('update-tray-icon', (_, dataUrl) => {
-  try { tray?.setImage(nativeImage.createFromDataURL(dataUrl)); } catch {}
+  try {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) return;
+    const img = nativeImage.createFromDataURL(dataUrl);
+    if (img.isEmpty()) return;
+    if (tray) {
+      tray.setImage(img);
+      lastValidIcon = img;
+      lastValidIconType = 'custom';
+    }
+  } catch {}
 });
 
 ipcMain.on('set-window-height', (_, h) => {
